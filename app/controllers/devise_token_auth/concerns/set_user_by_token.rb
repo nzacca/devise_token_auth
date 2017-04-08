@@ -134,7 +134,7 @@ module DeviseTokenAuth::Concerns::SetUserByToken
       mapping = Devise.mappings[resource_name] || Devise.mappings.values.first
     end
 
-    mapping.to
+    mapping.to if mapping
   end
 
 
