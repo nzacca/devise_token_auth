@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'test_helper'
 
 #  was the web request successful?
@@ -7,11 +9,11 @@ require 'test_helper'
 #  was the appropriate message delivered in the json payload?
 
 class Overrides::TokenValidationsControllerTest < ActionDispatch::IntegrationTest
+  include OverridesControllersRoutes
+
   describe Overrides::TokenValidationsController do
     before do
-      @resource = evil_users(:confirmed_email_user)
-      @resource.skip_confirmation!
-      @resource.save!
+      @resource = create(:user, :confirmed)
 
       @auth_headers = @resource.create_new_auth_token
 
@@ -22,17 +24,20 @@ class Overrides::TokenValidationsControllerTest < ActionDispatch::IntegrationTes
       # ensure that request is not treated as batch request
       age_token(@resource, @client_id)
 
-      get '/evil_user_auth/validate_token', {}, @auth_headers
+      get '/evil_user_auth/validate_token',
+          params: {},
+          headers: @auth_headers
 
       @resp = JSON.parse(response.body)
     end
 
-    test "token valid" do
+    test 'token valid' do
       assert_equal 200, response.status
     end
 
-    test "controller was overridden" do
-      assert_equal Overrides::TokenValidationsController::OVERRIDE_PROOF, @resp["override_proof"]
+    test 'controller was overridden' do
+      assert_equal Overrides::TokenValidationsController::OVERRIDE_PROOF,
+                   @resp['override_proof']
     end
   end
 end

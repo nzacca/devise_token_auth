@@ -1,5 +1,7 @@
+# frozen_string_literal: true
+
 class AuthOriginController < ApplicationController
   def redirected
-    render :nothing => true
+    head :ok
   end
 end

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'test_helper'
 
 #  was the web request successful?
@@ -9,9 +11,7 @@ require 'test_helper'
 class DeviseTokenAuth::TokenValidationsControllerTest < ActionDispatch::IntegrationTest
   describe DeviseTokenAuth::TokenValidationsController do
     before do
-      @resource = users(:confirmed_email_user)
-      @resource.skip_confirmation!
-      @resource.save!
+      @resource = create(:user, :confirmed)
 
       @auth_headers = @resource.create_new_auth_token
 
@@ -21,55 +21,66 @@ class DeviseTokenAuth::TokenValidationsControllerTest < ActionDispatch::Integrat
 
       # ensure that request is not treated as batch request
       age_token(@resource, @client_id)
-
     end
 
     describe 'vanilla user' do
       before do
-        get '/auth/validate_token', {}, @auth_headers
+        get '/auth/validate_token', params: {}, headers: @auth_headers
         @resp = JSON.parse(response.body)
       end
 
-      test "token valid" do
+      test 'token valid' do
         assert_equal 200, response.status
       end
     end
 
     describe 'using namespaces' do
       before do
-        get '/api/v1/auth/validate_token', {}, @auth_headers
+        get '/api/v1/auth/validate_token', params: {}, headers: @auth_headers
         @resp = JSON.parse(response.body)
       end
 
-      test "token valid" do
+      test 'token valid' do
         assert_equal 200, response.status
+      end
+    end
+
+    describe 'with invalid user' do
+      before do
+        @resource.update_column(:email, 'invalid') if DEVISE_TOKEN_AUTH_ORM == :active_record
+        @resource.set(email: 'invalid') if DEVISE_TOKEN_AUTH_ORM == :mongoid
+      end
+
+      test 'request should raise invalid model error' do
+        error = assert_raises DeviseTokenAuth::Errors::InvalidModel do
+          get '/auth/validate_token', params: {}, headers: @auth_headers
+        end
+        assert_equal(error.message, "Cannot set auth token in invalid model. Errors: [\"Email is not an email\"]")
       end
     end
 
     describe 'failure' do
       before do
-        get '/api/v1/auth/validate_token', {}, @auth_headers.merge({"access-token" => "12345"})
+        get '/api/v1/auth/validate_token',
+            params: {},
+            headers: @auth_headers.merge('access-token' => '12345')
         @resp = JSON.parse(response.body)
       end
 
-      test "request should fail" do
+      test 'request should fail' do
         assert_equal 401, response.status
       end
 
-      test "response should contain errors" do
+      test 'response should contain errors' do
         assert @resp['errors']
-        assert_equal @resp['errors'], [I18n.t("devise_token_auth.token_validations.invalid")]
+        assert_equal @resp['errors'], [I18n.t('devise_token_auth.token_validations.invalid')]
       end
     end
-
   end
 
   describe 'using namespaces with unused resource' do
-
     before do
-      @resource = scoped_users(:confirmed_email_user)
-      @resource.skip_confirmation!
-      @resource.save!
+      @resource = create(:scoped_user, :confirmed)
 
       @auth_headers = @resource.create_new_auth_token
 
@@ -81,11 +92,11 @@ class DeviseTokenAuth::TokenValidationsControllerTest < ActionDispatch::Integrat
       age_token(@resource, @client_id)
     end
 
-    test "should be successful" do
-      get '/api_v2/auth/validate_token', {}, @auth_headers
+    test 'should be successful' do
+      get '/api_v2/auth/validate_token',
+          params: {},
+          headers: @auth_headers
       assert_equal 200, response.status
     end
-
   end
-
 end
